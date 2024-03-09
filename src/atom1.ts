@@ -1,169 +1,181 @@
 import * as convert from "xml-js";
-import { generator } from "./config";
-import { Feed } from "./feed";
-import { Author, Category, Item } from "./typings";
-import { sanitize } from "./utils";
+import {Feed} from "./feed";
+import {Author, Category, Item} from "./typings";
+import {sanitize} from "./utils";
 
 /**
  * Returns an Atom feed
  * @param ins
  */
 export default (ins: Feed) => {
-  const { options } = ins;
+	const {options} = ins;
 
-  const base: any = {
-    _declaration: { _attributes: { version: "1.0", encoding: "utf-8" } },
-    feed: {
-      _attributes: { xmlns: "http://www.w3.org/2005/Atom" },
-      id: options.id,
-      title: options.title,
-      updated: options.updated ? options.updated.toISOString() : new Date().toISOString(),
-      generator: sanitize(options.generator || generator)
-    }
-  };
+	const base: any = {
+		_declaration: {_attributes: {version: "1.0", encoding: "utf-8"}},
+		feed: {
+			_attributes: {xmlns: "http://www.w3.org/2005/Atom", ...(options.feedAttributes || {})},
+			id: options.id,
+			title: options.title,
+			updated: options.updated ? options.updated.toISOString() : new Date().toISOString(),
+			// generator: sanitize(options.generator || generator)
+		}
+	};
 
-  if (options.author) {
-    base.feed.author = formatAuthor(options.author);
-  }
+	if (options.author) {
+		base.feed.author = formatAuthor(options.author);
+	}
 
-  base.feed.link = [];
+	base.feed.link = [];
 
-  // link (rel="alternate")
-  if (options.link) {
-    base.feed.link.push({ _attributes: { rel: "alternate", href: sanitize(options.link) } });
-  }
+	// link (rel="alternate")
+	if (options.link) {
+		base.feed.link.push({_attributes: {rel: "alternate", href: sanitize(options.link)}});
+	}
 
-  // link (rel="self")
-  const atomLink = sanitize(options.feed || (options.feedLinks && options.feedLinks.atom));
+	// link (rel="self")
+	const atomLink = sanitize(options.feed || (options.feedLinks && options.feedLinks.atom));
 
-  if (atomLink) {
-    base.feed.link.push({ _attributes: { rel: "self", href: sanitize(atomLink) } });
-  }
+	if (atomLink) {
+		base.feed.link.push({_attributes: {rel: "self", href: sanitize(atomLink)}});
+	}
 
-  // link (rel="hub")
-  if (options.hub) {
-    base.feed.link.push({ _attributes: { rel: "hub", href: sanitize(options.hub) } });
-  }
+	// link (rel="hub")
+	if (options.hub) {
+		base.feed.link.push({_attributes: {rel: "hub", href: sanitize(options.hub)}});
+	}
 
-  /**************************************************************************
-   * "feed" node: optional elements
-   *************************************************************************/
+	/**************************************************************************
+	 * "feed" node: optional elements
+	 *************************************************************************/
 
-  if (options.description) {
-    base.feed.subtitle = options.description;
-  }
+	if (options.description) {
+		base.feed.subtitle = options.description;
+	}
 
-  if (options.image) {
-    base.feed.logo = options.image;
-  }
+	if (options.image) {
+		base.feed.logo = options.image;
+	}
 
-  if (options.favicon) {
-    base.feed.icon = options.favicon;
-  }
+	if (options.favicon) {
+		base.feed.icon = options.favicon;
+	}
 
-  if (options.copyright) {
-    base.feed.rights = options.copyright;
-  }
+	if (options.copyright) {
+		base.feed.rights = options.copyright;
+	}
 
-  base.feed.category = [];
+	base.feed.category = [];
 
-  ins.categories.map((category: string) => {
-    base.feed.category.push({ _attributes: { term: category } });
-  });
+	ins.categories.map((category: string) => {
+		base.feed.category.push({_attributes: {term: category}});
+	});
 
-  base.feed.contributor = [];
+	base.feed.contributor = [];
 
-  ins.contributors.map((contributor: Author) => {
-    base.feed.contributor.push(formatAuthor(contributor));
-  });
+	ins.contributors.map((contributor: Author) => {
+		base.feed.contributor.push(formatAuthor(contributor));
+	});
 
-  // icon
+	// icon
 
-  base.feed.entry = [];
+	base.feed.entry = [];
 
-  /**************************************************************************
-   * "entry" nodes
-   *************************************************************************/
-  ins.items.map((item: Item) => {
-    //
-    // entry: required elements
-    //
+	/**************************************************************************
+	 * "entry" nodes
+	 *************************************************************************/
+	ins.items.map((item: Item) => {
+		//
+		// entry: required elements
+		//
+		const {title,
+			id,
+			link,
+			date,
+			content,
+			author,
+			category,
+			contributor,
+			published,
+			copyright,
+			...rest} = item
 
-    let entry: convert.ElementCompact = {
-      title: { _attributes: { type: "html" }, _cdata: item.title },
-      id: sanitize(item.id || item.link),
-      link: [{ _attributes: { href: sanitize(item.link) } }],
-      updated: item.date.toISOString()
-    };
+		const entry: convert.ElementCompact = {
+			...rest
+		};
 
-    //
-    // entry: recommended elements
-    //
-    if (item.description) {
-      entry.summary = {
-        _attributes: { type: "html" },
-        _cdata: item.description,
-      };
-    }
+		if (id) entry.id = sanitize(id || link)
+		if (link) entry.link = [{_attributes: {href: sanitize(link)}}]
+		if (title) entry.title = {_attributes: {type: "html"}, _cdata: title}
+		if (date) entry.updated = date.toISOString()
 
-    if (item.content) {
-      entry.content = {
-        _attributes: { type: "html" },
-        _cdata: item.content,
-      };
-    }
+		//
+		// entry: recommended elements
+		//
+		// if (description) {
+		// 	entry.summary = {
+		// 		_attributes: {type: "html"},
+		// 		_cdata: description,
+		// 	};
+		// }
 
-    // entry author(s)
-    if (Array.isArray(item.author)) {
-      entry.author = [];
+		if (content) {
+			entry.content = {
+				_attributes: {type: "html"},
+				_cdata: content,
+			};
+		}
 
-      item.author.map((author: Author) => {
-        entry.author.push(formatAuthor(author));
-      });
-    }
+		// entry author(s)
+		if (Array.isArray(author)) {
+			entry.author = [];
 
-    // content
+			author.map((author: Author) => {
+				entry.author.push(formatAuthor(author));
+			});
+		}
 
-    // link - relative link to article
+		// content
 
-    //
-    // entry: optional elements
-    //
+		// link - relative link to article
 
-    // category
-    if (Array.isArray(item.category)) {
-      entry.category = [];
+		//
+		// entry: optional elements
+		//
 
-      item.category.map((category: Category) => {
-        entry.category.push(formatCategory(category));
-      });
-    }
+		// category
+		if (Array.isArray(category)) {
+			entry.category = [];
 
-    // contributor
-    if (item.contributor && Array.isArray(item.contributor)) {
-      entry.contributor = [];
+			category.map((category: Category) => {
+				entry.category.push(formatCategory(category));
+			});
+		}
 
-      item.contributor.map((contributor: Author) => {
-        entry.contributor.push(formatAuthor(contributor));
-      });
-    }
+		// contributor
+		if (contributor && Array.isArray(contributor)) {
+			entry.contributor = [];
 
-    // published
-    if (item.published) {
-      entry.published = item.published.toISOString();
-    }
+			contributor.map((contributor: Author) => {
+				entry.contributor.push(formatAuthor(contributor));
+			});
+		}
 
-    // source
+		// published
+		if (published) {
+			entry.published = published.toISOString();
+		}
 
-    // rights
-    if (item.copyright) {
-      entry.rights = item.copyright;
-    }
+		// source
 
-    base.feed.entry.push(entry);
-  });
+		// rights
+		if (copyright) {
+			entry.rights = copyright;
+		}
 
-  return convert.js2xml(base, { compact: true, ignoreComment: true, spaces: 4 });
+		base.feed.entry.push(entry);
+	});
+
+	return convert.js2xml(base, {compact: true, ignoreComment: true, spaces: 4});
 };
 
 /**
@@ -171,18 +183,18 @@ export default (ins: Feed) => {
  * @param author
  */
 const formatAuthor = (author: Author) => {
-  const { name, email, link } = author;
+	const {name, email, link} = author;
 
-  const out: { name?: string, email?: string, uri?: string } = { name };
-  if (email) {
-    out.email = email;
-  }
+	const out: {name?: string, email?: string, uri?: string} = {name};
+	if (email) {
+		out.email = email;
+	}
 
-  if (link) {
-    out.uri = sanitize(link);
-  }
+	if (link) {
+		out.uri = sanitize(link);
+	}
 
-  return out;
+	return out;
 };
 
 /**
@@ -190,13 +202,13 @@ const formatAuthor = (author: Author) => {
  * @param category
  */
 const formatCategory = (category: Category) => {
-  const { name, scheme, term } = category;
+	const {name, scheme, term} = category;
 
-  return {
-    _attributes: {
-      label: name,
-      scheme,
-      term,
-    },
-  };
+	return {
+		_attributes: {
+			label: name,
+			scheme,
+			term,
+		},
+	};
 };
